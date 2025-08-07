@@ -65,26 +65,29 @@ class MainWindow:
         
         # 离职日期
         ttk.Label(main_frame, text="离职日期:").grid(row=2, column=0, sticky=tk.W, pady=5)
-        self.date_entry = DateEntry(main_frame, 
-                                   width=27, 
-                                   background='lightblue',
-                                   foreground='black', 
-                                   borderwidth=1,
-                                   headersbackground='darkblue',
-                                   headersforeground='white',
-                                   selectbackground='lightblue',
-                                   selectforeground='black',
-                                   normalbackground='white',
-                                   normalforeground='black',
-                                   weekendbackground='lightgray',
-                                   weekendforeground='black',
-                                   othermonthbackground='lightgray',
-                                   othermonthforeground='gray',
-                                   date_pattern='yyyy-mm-dd',
-                                   locale='zh_CN',
-                                   maxdate=date.today(),
-                                   showweeknumbers=False)
-        self.date_entry.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # 创建日期输入框架
+        date_frame = ttk.Frame(main_frame)
+        date_frame.grid(row=2, column=1, sticky=(tk.W, tk.E), pady=5)
+        
+        # 使用更兼容的日期输入方案，解决macOS上DateEntry的显示问题
+        # 创建日期输入框
+        self.date_var = tk.StringVar(value=date.today().strftime('%Y-%m-%d'))
+        self.date_entry = ttk.Entry(date_frame, 
+                                   textvariable=self.date_var,
+                                   width=15,
+                                   font=('Arial', 10))
+        self.date_entry.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # 添加日期选择按钮
+        self.calendar_button = ttk.Button(date_frame, text="📅", width=3,
+                                         command=self._show_calendar)
+        self.calendar_button.pack(side=tk.LEFT, padx=(0, 5))
+        
+        # 添加日期格式提示
+        date_hint = ttk.Label(date_frame, text="(YYYY-MM-DD)", 
+                             font=('Arial', 8), foreground='gray')
+        date_hint.pack(side=tk.LEFT, padx=(5, 0))
         
         # 按钮框架
         button_frame = ttk.Frame(main_frame)
@@ -136,20 +139,85 @@ class MainWindow:
         y = (self.root.winfo_screenheight() // 2) - (height // 2)
         self.root.geometry(f'{width}x{height}+{x}+{y}')
     
+    def _show_calendar(self):
+        """显示日历选择器"""
+        try:
+            # 创建顶层窗口
+            calendar_window = tk.Toplevel(self.root)
+            calendar_window.title("选择日期")
+            calendar_window.geometry("300x250")
+            calendar_window.resizable(False, False)
+            
+            # 居中显示
+            calendar_window.transient(self.root)
+            calendar_window.grab_set()
+            
+            # 创建日历组件
+            from tkcalendar import Calendar
+            
+            # 获取当前日期
+            try:
+                current_date = datetime.strptime(self.date_var.get(), '%Y-%m-%d').date()
+            except:
+                current_date = date.today()
+            
+            cal = Calendar(calendar_window,
+                          selectmode='day',
+                          year=current_date.year,
+                          month=current_date.month,
+                          day=current_date.day,
+                          date_pattern='yyyy-mm-dd',
+                          showweeknumbers=False,
+                          showothermonthdays=True)
+            cal.pack(pady=10)
+            
+            # 按钮框架
+            button_frame = ttk.Frame(calendar_window)
+            button_frame.pack(pady=10)
+            
+            def on_select():
+                selected_date = cal.get_date()
+                self.date_var.set(selected_date)
+                calendar_window.destroy()
+            
+            def on_cancel():
+                calendar_window.destroy()
+            
+            # 确定和取消按钮
+            ttk.Button(button_frame, text="确定", command=on_select).pack(side=tk.LEFT, padx=5)
+            ttk.Button(button_frame, text="取消", command=on_cancel).pack(side=tk.LEFT, padx=5)
+            
+            # 居中窗口
+            calendar_window.update_idletasks()
+            x = (calendar_window.winfo_screenwidth() // 2) - (calendar_window.winfo_width() // 2)
+            y = (calendar_window.winfo_screenheight() // 2) - (calendar_window.winfo_height() // 2)
+            calendar_window.geometry(f"+{x}+{y}")
+            
+        except Exception as e:
+            self.logger.error(f"显示日历失败: {e}")
+            messagebox.showerror("错误", f"无法显示日历: {e}")
+    
     def _on_calculate(self):
         """计算按钮点击事件"""
         # 获取输入
         employee_name = self.name_entry.get().strip()
-        leave_date = self.date_entry.get_date()
+        
+        # 验证日期格式并获取日期
+        try:
+            leave_date = datetime.strptime(self.date_var.get(), '%Y-%m-%d').date()
+        except ValueError:
+            messagebox.showerror("错误", "请输入正确的日期格式 (YYYY-MM-DD)")
+            return
         
         # 验证输入
         if not employee_name:
             messagebox.showerror("错误", "请输入员工姓名")
             return
         
-        if leave_date > date.today():
-            messagebox.showerror("错误", "离职日期不能超过今天")
-            return
+        # 移除日期限制，允许选择任何日期
+        # if leave_date > date.today():
+        #     messagebox.showerror("错误", "离职日期不能超过今天")
+        #     return
         
         # 禁用按钮，显示计算状态
         self.calc_button.config(state=tk.DISABLED)
@@ -239,7 +307,7 @@ class MainWindow:
     def _on_clear(self):
         """清空按钮点击事件"""
         self.name_entry.delete(0, tk.END)
-        self.date_entry.set_date(date.today())
+        self.date_var.set(date.today().strftime('%Y-%m-%d'))
         self._update_result_display("")
         self.status_var.set("就绪")
         self.calc_button.config(state=tk.NORMAL)
