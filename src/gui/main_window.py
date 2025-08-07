@@ -117,11 +117,7 @@ class MainWindow:
         self.result_text.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S))
         
-        # 状态栏
-        self.status_var = tk.StringVar(value="就绪")
-        status_bar = ttk.Label(main_frame, textvariable=self.status_var, 
-                              relief=tk.SUNKEN, anchor=tk.W)
-        status_bar.grid(row=5, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=(10, 0))
+        # 移除状态栏 - 根据老大要求简化界面
         
         # 配置列权重
         main_frame.columnconfigure(1, weight=1)
@@ -221,7 +217,6 @@ class MainWindow:
         
         # 禁用按钮，显示计算状态
         self.calc_button.config(state=tk.DISABLED)
-        self.status_var.set("正在计算...")
         self._update_result_display("正在计算年假，请稍候...", "blue")
         
         # 启动后台计算
@@ -266,24 +261,40 @@ class MainWindow:
         self.root.after(100, self._check_results)
     
     def _show_success_result(self, result_data):
-        """显示成功结果"""
+        """显示成功结果 - 简化界面，去掉标题"""
         # result_data是CalculationResult对象，不是字典
         remaining_days = result_data.remaining_days
         calculation_details = result_data.calculation_details
         
-        # 格式化结果文本
-        result_text = f"计算完成！\n\n"
-        result_text += f"剩余年假: {remaining_days:.1f} 天\n\n"
+        # 清空并重新配置结果显示区域
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
         
+        # 配置不同的文本标签样式
+        self.result_text.tag_configure("main_result", font=("Arial", 18, "bold"), foreground="#2E8B57", justify="center")
+        self.result_text.tag_configure("details_header", font=("Arial", 10, "bold"), foreground="#666666")
+        self.result_text.tag_configure("details_content", font=("Arial", 9), foreground="#888888")
+        
+        # 直接插入主要结果 - 放大强化显示，去掉"计算完成"标题
+        main_result = f"🎯 剩余年假: {remaining_days:.1f} 天\n\n"
+        self.result_text.insert(tk.END, main_result, "main_result")
+        
+        # 插入详细信息 - 弱化显示
         if calculation_details:
-            result_text += "详细信息:\n"
-            result_text += f"• 理论年假: {calculation_details.get('theoretical_hours', 0):.1f} 小时\n"
-            result_text += f"• 已使用: {calculation_details.get('used_hours', 0):.1f} 小时\n"
-            result_text += f"• 实际剩余: {calculation_details.get('actual_remaining_hours', 0):.1f} 小时\n"
-            result_text += f"• 时间比例: {calculation_details.get('time_ratio', 0):.2%}\n"
+            self.result_text.insert(tk.END, "📊 详细信息:\n", "details_header")
+            
+            details_text = ""
+            details_text += f"• 理论年假: {calculation_details.get('theoretical_hours', 0):.1f} 小时\n"
+            details_text += f"• 已使用: {calculation_details.get('used_hours', 0):.1f} 小时\n"
+            details_text += f"• 实际剩余: {calculation_details.get('actual_remaining_hours', 0):.1f} 小时\n"
+            details_text += f"• 时间比例: {calculation_details.get('time_ratio', 0):.2%}\n"
+            
+            self.result_text.insert(tk.END, details_text, "details_content")
         
-        self._update_result_display(result_text, "green")
-        self.status_var.set("计算完成")
+        # 居中对齐主要结果
+        self.result_text.tag_configure("main_result", justify="center")
+        
+        self.result_text.config(state=tk.DISABLED)
         self.calc_button.config(state=tk.NORMAL)
         
         self.logger.info(f"计算成功: 剩余年假 {remaining_days:.1f} 天")
@@ -305,11 +316,11 @@ class MainWindow:
         self.result_text.config(state=tk.DISABLED, fg=color)
     
     def _on_clear(self):
-        """清空按钮点击事件"""
+        """处理清空按钮点击事件"""
+        # 重置所有输入字段
         self.name_entry.delete(0, tk.END)
         self.date_var.set(date.today().strftime('%Y-%m-%d'))
         self._update_result_display("")
-        self.status_var.set("就绪")
         self.calc_button.config(state=tk.NORMAL)
     
     def run(self):
