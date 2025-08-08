@@ -275,11 +275,16 @@ def main():
 if __name__ == "__main__":
     success = main()
     
+    # 检查是否在CI环境中运行
+    is_ci = os.getenv('CI') or os.getenv('GITHUB_ACTIONS')
+    
     if not success:
-        print("\n按回车键退出...")
-        input()
+        if not is_ci:
+            print("\n按回车键退出...")
+            input()
         sys.exit(1)
     else:
         print("\n🐔 斯格拉奇完成任务！老大的项目已成功打包！✨")
-        print("按回车键退出...")
-        input()
+        if not is_ci:
+            print("按回车键退出...")
+            input()
