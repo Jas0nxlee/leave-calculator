@@ -195,6 +195,9 @@ class WeChatWorkService:
             self.logger.error(f"❌ 未找到员工: {name}")
             raise EmployeeNotFoundError(60011, f"未找到员工: {name}")
             
+        except EmployeeNotFoundError:
+            # 重新抛出员工未找到异常，不要包装
+            raise
         except requests.RequestException as e:
             self.logger.error(f"❌ 网络请求失败: {str(e)}")
             raise WeChatAPIError(-1, f"网络请求失败: {str(e)}")

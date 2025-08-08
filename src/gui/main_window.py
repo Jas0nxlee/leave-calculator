@@ -263,6 +263,12 @@ class MainWindow:
     def _show_success_result(self, result_data):
         """显示成功结果 - 简化界面，去掉标题"""
         # result_data是CalculationResult对象，不是字典
+        # 首先检查计算是否真的成功
+        if not result_data.success:
+            # 如果计算失败，显示错误信息
+            self._show_error_result(result_data.error_message)
+            return
+        
         remaining_days = result_data.remaining_days
         calculation_details = result_data.calculation_details
         
@@ -300,10 +306,30 @@ class MainWindow:
         self.logger.info(f"计算成功: 剩余年假 {remaining_days:.1f} 天")
     
     def _show_error_result(self, error_msg):
-        """显示错误结果"""
-        result_text = f"计算失败！\n\n错误信息: {error_msg}"
-        self._update_result_display(result_text, "red")
-        self.status_var.set("计算失败")
+        """显示错误结果 - 优化显示格式"""
+        # 清空并重新配置结果显示区域
+        self.result_text.config(state=tk.NORMAL)
+        self.result_text.delete(1.0, tk.END)
+        
+        # 配置错误信息的样式
+        self.result_text.tag_configure("error_title", font=("Arial", 14, "bold"), foreground="#DC143C", justify="center")
+        self.result_text.tag_configure("error_content", font=("Arial", 11), foreground="#B22222", justify="center")
+        
+        # 根据错误类型显示不同的图标和提示
+        if "未找到员工" in error_msg or "员工不存在" in error_msg:
+            # 员工未找到的特殊提示
+            self.result_text.insert(tk.END, "👤 员工信息查询失败\n\n", "error_title")
+            self.result_text.insert(tk.END, f"❌ {error_msg}\n\n", "error_content")
+            self.result_text.insert(tk.END, "💡 请检查:\n", "error_content")
+            self.result_text.insert(tk.END, "• 员工姓名是否正确\n", "error_content")
+            self.result_text.insert(tk.END, "• 员工是否在企业微信通讯录中\n", "error_content")
+            self.result_text.insert(tk.END, "• 网络连接是否正常", "error_content")
+        else:
+            # 其他错误的通用提示
+            self.result_text.insert(tk.END, "⚠️ 计算失败\n\n", "error_title")
+            self.result_text.insert(tk.END, f"❌ {error_msg}", "error_content")
+        
+        self.result_text.config(state=tk.DISABLED)
         self.calc_button.config(state=tk.NORMAL)
         
         self.logger.error(f"计算失败: {error_msg}")

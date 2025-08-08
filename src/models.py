@@ -68,8 +68,10 @@ class CalculationInput:
         if not self.employee_name or not self.employee_name.strip():
             return ValidationResult(False, "员工姓名不能为空")
 
-        if self.resignation_date > date.today():
-            return ValidationResult(False, "离职日期不能超过当前日期")
+        # 允许未来日期，但不能太远（比如不超过当前年份+1年）
+        current_year = date.today().year
+        if self.resignation_date.year > current_year + 1:
+            return ValidationResult(False, f"离职日期不能超过{current_year + 1}年")
 
         if self.resignation_date.year != 2025:
             return ValidationResult(False, "目前只支持2025年的年假计算")
