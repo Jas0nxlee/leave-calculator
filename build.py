@@ -17,6 +17,21 @@ import platform
 
 def print_banner():
     """打印启动横幅"""
+    # 设置控制台编码为UTF-8，解决Windows下的Unicode显示问题
+    if platform.system() == "Windows":
+        try:
+            # 尝试设置控制台编码为UTF-8
+            import codecs
+            sys.stdout = codecs.getwriter('utf-8')(sys.stdout.detach())
+            sys.stderr = codecs.getwriter('utf-8')(sys.stderr.detach())
+        except:
+            # 如果设置失败，使用ASCII安全的版本
+            print("=" * 70)
+            print("Leave Calculator - Automated Build Tool")
+            print("   Customized for Boss Li Jingping's Project")
+            print("=" * 70)
+            return
+    
     print("=" * 70)
     print("🐔 离职年假计算器 - 自动化打包工具")
     print("   为老大李京平的神级项目量身定制 ✨")
