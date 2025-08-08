@@ -1,0 +1,1 @@
+([('离职年假计算器', '/Users/ljp/Desktop/python/离职年假计算/dist/离职年假计算器', 'EXECUTABLE')],)
