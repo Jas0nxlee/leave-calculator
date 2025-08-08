@@ -18,32 +18,44 @@ src_dir = current_dir / "src"
 sys.path.insert(0, str(src_dir))
 
 def setup_logging():
-    """设置日志配置"""
+    """设置日志配置 - 优化版：只记录关键日志到文件"""
     # 创建logs目录
     logs_dir = current_dir / "logs"
     logs_dir.mkdir(exist_ok=True)
     
     # 配置日志格式
     log_format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    simple_format = '%(asctime)s - %(levelname)s - %(message)s'
     
-    # 配置根日志记录器
-    logging.basicConfig(
-        level=logging.INFO,
-        format=log_format,
-        handlers=[
-            # 文件处理器
-            logging.FileHandler(
-                logs_dir / "leave_calculator.log",
-                encoding='utf-8'
-            ),
-            # 控制台处理器
-            logging.StreamHandler(sys.stdout)
-        ]
+    # 创建根日志记录器
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)  # 允许所有级别的日志
+    
+    # 文件处理器 - 只记录WARNING及以上级别的关键日志
+    file_handler = logging.FileHandler(
+        logs_dir / "leave_calculator.log",
+        encoding='utf-8'
     )
+    file_handler.setLevel(logging.WARNING)  # 只记录警告和错误
+    file_handler.setFormatter(logging.Formatter(simple_format))
+    
+    # 控制台处理器 - 显示所有INFO及以上级别的日志
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter(log_format))
+    
+    # 添加处理器到根日志记录器
+    root_logger.addHandler(file_handler)
+    root_logger.addHandler(console_handler)
     
     # 设置第三方库的日志级别
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('requests').setLevel(logging.WARNING)
+    
+    # 设置特定模块的日志级别 - 减少详细输出
+    logging.getLogger('services.wechat_service').setLevel(logging.WARNING)  # 只记录警告和错误
+    logging.getLogger('business.controller').setLevel(logging.INFO)  # 保持业务逻辑日志
+    logging.getLogger('gui.main_window').setLevel(logging.INFO)  # 保持GUI日志
 
 def check_virtual_environment():
     """检查是否在虚拟环境中运行"""

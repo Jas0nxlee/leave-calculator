@@ -64,6 +64,12 @@ class WeChatWorkService:
         
         return session
 
+    def _is_token_valid(self) -> bool:
+        """检查token是否有效"""
+        if not self._access_token or not self._token_expires_at:
+            return False
+        return time.time() < self._token_expires_at
+
     def _handle_api_response(self, response_data: Dict[str, Any]) -> Dict[str, Any]:
         """处理API响应"""
         errcode = response_data.get("errcode", -1)
@@ -85,47 +91,46 @@ class WeChatWorkService:
         # 其他错误
         raise WeChatAPIError(errcode, errmsg)
 
-    def get_access_token(self) -> str:
-        """
-        获取访问令牌
-        
-        Returns:
-            str: 访问令牌
-            
-        Raises:
-            WeChatAPIError: API调用失败时抛出
-        """
-        # 检查缓存的token是否有效
-        now = time.time()
-        if (self._access_token and self._token_expires_at and 
-            now < self._token_expires_at):
-            return self._access_token
-
-        # 获取新的token
-        url = f"{self.config.base_url}/cgi-bin/gettoken"
-        params = {
-            "corpid": self.config.corp_id,
-            "corpsecret": self.config.corp_secret
-        }
-
+    def _get_access_token(self) -> str:
+        """获取企业微信access_token"""
         try:
+            # 检查缓存的token是否有效
+            if self._is_token_valid():
+                self.logger.debug("✅ 使用缓存的access_token")
+                return self._access_token
+            
+            self.logger.info("🔑 获取新的access_token...")
+            
+            # 构建请求URL
+            url = f"{self.config.base_url}/cgi-bin/gettoken"
+            params = {
+                'corpid': self.config.corp_id,
+                'corpsecret': self.config.corp_secret
+            }
+            
+            # 发送请求
             response = self._session.get(url, params=params)
             response.raise_for_status()
-            data = response.json()
             
+            data = response.json()
+            self.logger.debug(f"📥 获取token API响应: {data}")
+            
+            # 处理API响应
             result = self._handle_api_response(data)
             
+            # 更新token和过期时间
             self._access_token = result["access_token"]
-            expires_in = result.get("expires_in", 7200)
-            # 提前5分钟过期，避免边界情况
-            self._token_expires_at = now + expires_in - 300
+            self._token_expires_at = time.time() + result.get("expires_in", 7200) - 300  # 提前5分钟过期
             
-            self.logger.info("成功获取企业微信访问令牌")
+            self.logger.info("✅ 成功获取access_token")
             return self._access_token
             
         except requests.RequestException as e:
-            self.logger.error(f"获取访问令牌网络请求失败: {str(e)}")
-            raise WeChatAPIError(-1, f"网络请求失败: {str(e)}")
+            self.logger.error(f"❌ 获取access_token网络请求失败: {str(e)}")
+            raise WeChatAPIError(-1, f"获取access_token失败: {str(e)}")
+        except Exception as e:
+            self.logger.error(f"❌ 获取access_token时发生未知错误: {str(e)}")
+            raise WeChatAPIError(-1, f"获取access_token失败: {str(e)}")
 
     def find_employee_by_name(self, name: str) -> Employee:
         """
@@ -144,9 +149,7 @@ class WeChatWorkService:
         try:
             # 获取access_token
             self.logger.info(f"🔍 开始查找员工: {name}")
-            self.logger.info("🔑 获取企业微信access_token...")
-            access_token = self.get_access_token()
-            self.logger.info(f"✅ 成功获取access_token: {access_token[:20]}...")
+            access_token = self._get_access_token()
             
             # 构建请求URL
             url = f"{self.config.base_url}/cgi-bin/user/list"
@@ -158,15 +161,12 @@ class WeChatWorkService:
                 "fetch_child": 1     # 递归获取子部门用户
             }
             
-            self.logger.info(f"🌐 请求URL: {url}")
-            self.logger.info(f"📋 请求参数: {params}")
-            
             # 发送GET请求
             response = self._session.get(url, params=params)
             response.raise_for_status()
             
             data = response.json()
-            self.logger.info(f"📥 企业微信用户列表API完整响应: {data}")
+            self.logger.debug(f"📥 企业微信用户列表API完整响应: {data}")
             
             result = self._handle_api_response(data)
             
@@ -177,11 +177,11 @@ class WeChatWorkService:
             for i, user in enumerate(userlist):
                 user_name = user.get("name", "")
                 user_id = user.get("userid", "")
-                self.logger.info(f"👤 用户 {i+1}: {user_name} (ID: {user_id})")
+                self.logger.debug(f"👤 用户 {i+1}: {user_name} (ID: {user_id})")
                 
                 if user_name == name:
                     self.logger.info(f"✅ 找到匹配员工: {user_name} (ID: {user_id})")
-                    self.logger.info(f"📋 完整用户信息: {user}")
+                    self.logger.debug(f"📋 完整用户信息: {user}")
                     
                     return Employee(
                         user_id=user_id,
@@ -230,7 +230,7 @@ class WeChatWorkService:
             self.logger.info("=" * 80)
             
             self.logger.info("🔑 开始获取企业微信access_token...")
-            access_token = self.get_access_token()
+            access_token = self._get_access_token()
             self.logger.info(f"✅ 成功获取access_token: {access_token[:20]}...{access_token[-10:]}")
             
             # 构建请求URL
@@ -447,7 +447,7 @@ class WeChatWorkService:
         这是一个示例方法，展示如何通过审批记录计算假期余额
         实际使用时需要根据企业的审批模板ID和字段配置进行调整
         """
-        access_token = self.get_access_token()
+        access_token = self._get_access_token()
         url = f"{self.config.base_url}/cgi-bin/oa/getapprovaldata"
         
         # 计算查询时间范围（整年）
@@ -491,7 +491,7 @@ class WeChatWorkService:
             bool: 连接是否成功
         """
         try:
-            self.get_access_token()
+            self._get_access_token()
             return True
         except Exception as e:
             self.logger.error(f"企业微信连接测试失败: {str(e)}")
